@@ -7,11 +7,18 @@ internal class Program
 {
     private static async Task<int> Main(string[] args)
     {
-        RootCommand rootCommand = new();
-        Argument<string> regexPatternArgument = new Argument<string>("regex");
-        Argument<string> filePatternArgument = new Argument<string>("file pattern", () => "*");
+        Argument<string> regexPatternArgument = new(
+            name: "regex",
+            description: "The text to be searched for.");
+        Argument<string> filePatternArgument = new Argument<string>(
+            name: "file pattern",
+            getDefaultValue: () => "*",
+            description: "The files to search for.");
+
+        RootCommand rootCommand = new(description: "A utility for searching for text.");
         rootCommand.AddArgument(regexPatternArgument);
         rootCommand.AddArgument(filePatternArgument);
+        
         rootCommand.SetHandler(async (regexPattern, filePattern) =>
         {
             Program program = new(regexPattern, filePattern);
@@ -36,8 +43,13 @@ internal class Program
 
     private async Task Run()
     {
+        // Create a dataflow block to read individual lines from matching files.
         TransformManyBlock<string, FileReadResult> fileToLineTransformer = new(FileReadTransformFunction);
+        
+        // Create a dataflow block to match lines against the desired text.
         TransformManyBlock<FileReadResult, MatchResult> lineToMatchTransformer = new(LineMatchTransformFunction);
+        
+        // Create a dataflow block to output the matches.
         ActionBlock<MatchResult> matchHandler = new(PrintMatch);
 
         fileToLineTransformer.LinkTo(lineToMatchTransformer, new() { PropagateCompletion = true });
@@ -52,13 +64,17 @@ internal class Program
             RecurseSubdirectories = true
         };
 
+        // Find all matching files...
         foreach (string file in Directory.EnumerateFiles(currentDirectory, _filePattern, enumerationOptions))
         {
+            // ... and push them to the first dataflow block.
             fileToLineTransformer.Post(file);
         }
 
+        // Mark the first block as complete...
         fileToLineTransformer.Complete();
 
+        // ... and wait for the last one to finish.
         await matchHandler.Completion;
     }
 
@@ -109,10 +125,32 @@ internal class Program
     }
 }
 
+/// <summary>
+///   Represents the result of attempting to read lines from a file.
+/// </summary>
 abstract record class FileReadResult(string FilePath);
+
+/// <summary>
+///   A <see cref="FileReadResult"/> for when an error occurred while trying to read a file.
+/// </summary>
 record class ErrorReadResult(string FilePath, string Message) : FileReadResult(FilePath);
+
+/// <summary>
+///   Represents a single line successfully read from a file.
+/// </summary>
 record class LineReadResult(string FilePath, int LineNumber, string Line) : FileReadResult(FilePath);
 
+/// <summary>
+///   Represents the result of attempting to match a regex against a <see cref="FileReadResult"/>.
+/// </summary>
 abstract record class MatchResult(string FilePath);
+
+/// <summary>
+///   A <see cref="MatchResult"/> representing an <see cref="ErrorReadResult"/>.
+/// </summary>
 record class ErrorMatchResult(string FilePath, string Message) : MatchResult(FilePath);
+
+/// <summary>
+///   Represents a successful match.
+/// </summary>
 record class LineMatchResult(string FilePath, int LineNumber, int Column, int Length, string Line) : MatchResult(FilePath);
