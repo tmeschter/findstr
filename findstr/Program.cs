@@ -24,7 +24,7 @@ internal class Program
         rootCommand.AddArgument(regexPatternArgument);
         rootCommand.AddArgument(filePatternArgument);
         rootCommand.AddOption(recurse);
-        
+
         rootCommand.SetHandler(async (regexPattern, filePattern, recurse) =>
         {
             Program program = new(regexPattern, filePattern, recurse);
@@ -123,12 +123,12 @@ internal class Program
 
         if (matchResult is ErrorMatchResult errorMatchResult)
         {
-            AnsiConsole.Markup($"[grey]{relativePath}: [/][red]{errorMatchResult.Message}[/]");
+            AnsiConsole.MarkupInterpolated($"[grey]{relativePath}: [/][red]{errorMatchResult.Message}[/]");
             AnsiConsole.WriteLine();
         }
         else if (matchResult is LineMatchResult lineMatchResult)
         {
-            AnsiConsole.Markup($"[grey]{relativePath}, {lineMatchResult.LineNumber}: [/][yellow]{lineMatchResult.Line}[/]");
+            AnsiConsole.MarkupInterpolated($"[grey]{relativePath}, {lineMatchResult.LineNumber}: [/][yellow]{lineMatchResult.Line}[/]");
             AnsiConsole.WriteLine();
         }
     }
