@@ -15,30 +15,39 @@ internal class Program
             getDefaultValue: () => "*",
             description: "The files to search for.");
 
+        Option<bool> recurse = new(
+            aliases: new[] { "--recurse", "-r" },
+            getDefaultValue: () => true,
+            description: "Whether or not to recurse into subdirectories");
+
         RootCommand rootCommand = new(description: "A utility for searching for text.");
         rootCommand.AddArgument(regexPatternArgument);
         rootCommand.AddArgument(filePatternArgument);
+        rootCommand.AddOption(recurse);
         
-        rootCommand.SetHandler(async (regexPattern, filePattern) =>
+        rootCommand.SetHandler(async (regexPattern, filePattern, recurse) =>
         {
-            Program program = new(regexPattern, filePattern);
+            Program program = new(regexPattern, filePattern, recurse);
             await program.Run();
         },
         regexPatternArgument,
-        filePatternArgument);
+        filePatternArgument,
+        recurse);
 
         return await rootCommand.InvokeAsync(args);
     }
 
     private readonly string _regexPattern;
     private readonly string _filePattern;
+    private readonly bool _recurse;
     private readonly Regex _regex;
 
-    private Program(string regexPattern, string filePattern)
+    private Program(string regexPattern, string filePattern, bool recurse)
     {
         _regex = new Regex(regexPattern);
         _regexPattern = regexPattern;
         _filePattern = filePattern;
+        _recurse = recurse;
     }
 
     private async Task Run()
@@ -61,7 +70,7 @@ internal class Program
             IgnoreInaccessible = true,
             MatchCasing = MatchCasing.PlatformDefault,
             MatchType = MatchType.Simple,
-            RecurseSubdirectories = true
+            RecurseSubdirectories = _recurse
         };
 
         // Find all matching files...
