@@ -20,19 +20,26 @@ internal class Program
             getDefaultValue: () => true,
             description: "Whether or not to recurse into subdirectories");
 
+        Option<bool> insensitive = new(
+            aliases: new[] { "--insensitive", "-i" },
+            getDefaultValue: () => true,
+            description: "Whether to consider case while matching the pattern");
+
         RootCommand rootCommand = new(description: "A utility for searching for text.");
         rootCommand.AddArgument(regexPatternArgument);
         rootCommand.AddArgument(filePatternArgument);
         rootCommand.AddOption(recurse);
+        rootCommand.AddOption(insensitive);
 
-        rootCommand.SetHandler(async (regexPattern, filePattern, recurse) =>
+        rootCommand.SetHandler(async (regexPattern, filePattern, recurse, insensitive) =>
         {
-            Program program = new(regexPattern, filePattern, recurse);
+            Program program = new(regexPattern, filePattern, recurse, insensitive);
             await program.Run();
         },
         regexPatternArgument,
         filePatternArgument,
-        recurse);
+        recurse,
+        insensitive);
 
         return await rootCommand.InvokeAsync(args);
     }
@@ -42,9 +49,10 @@ internal class Program
     private readonly bool _recurse;
     private readonly Regex _regex;
 
-    private Program(string regexPattern, string filePattern, bool recurse)
+    private Program(string regexPattern, string filePattern, bool recurse, bool insensitive)
     {
-        _regex = new Regex(regexPattern);
+        RegexOptions options = insensitive ? RegexOptions.IgnoreCase : RegexOptions.None;
+        _regex = new Regex(regexPattern, options);
         _regexPattern = regexPattern;
         _filePattern = filePattern;
         _recurse = recurse;
