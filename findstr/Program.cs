@@ -31,15 +31,16 @@ internal class Program
         rootCommand.AddOption(recurse);
         rootCommand.AddOption(insensitive);
 
-        rootCommand.SetHandler(async (regexPattern, filePattern, recurse, insensitive) =>
-        {
-            Program program = new(regexPattern, filePattern, recurse, insensitive);
-            await program.Run();
-        },
-        regexPatternArgument,
-        filePatternArgument,
-        recurse,
-        insensitive);
+        rootCommand.SetHandler(
+            async (regexPattern, filePattern, recurse, insensitive) =>
+            {
+                Program program = new(regexPattern, filePattern, recurse, insensitive);
+                await program.Run();
+            },
+            regexPatternArgument,
+            filePatternArgument,
+            recurse,
+            insensitive);
 
         return await rootCommand.InvokeAsync(args);
     }
@@ -113,13 +114,14 @@ internal class Program
         }
         else if (readResult is LineReadResult lineReadResult)
         {
-            if (_regex.Match(lineReadResult.Line) is { Success: true } match)
+            if (_regex.Matches(lineReadResult.Line) is { Count: >0 } matches)
             {
+                IEnumerable<MatchSpan> spans = matches.Select(match => new MatchSpan(match.Index, match.Length));
+
                 yield return new LineMatchResult(
                     lineReadResult.FilePath,
                     lineReadResult.LineNumber,
-                    match.Index,
-                    match.Length,
+                    spans,
                     lineReadResult.Line);
             }
         }
@@ -136,8 +138,16 @@ internal class Program
         }
         else if (matchResult is LineMatchResult lineMatchResult)
         {
-            AnsiConsole.MarkupInterpolated($"[grey]{relativePath}, {lineMatchResult.LineNumber}: [/][yellow]{lineMatchResult.Line}[/]");
-            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupInterpolated($"[grey]{relativePath}, {lineMatchResult.LineNumber}: [/]");
+            int column = 0;
+            string line = lineMatchResult.Line;
+            foreach (MatchSpan matchSpan in lineMatchResult.Spans)
+            {
+                Console.Write(line.Substring(column, matchSpan.Column - column));
+                AnsiConsole.MarkupInterpolated($"[yellow]{line.Substring(matchSpan.Column, matchSpan.Length)}[/]");
+                column = matchSpan.Column + matchSpan.Length;
+            }
+            Console.WriteLine(line.Substring(column));
         }
     }
 }
@@ -168,6 +178,11 @@ abstract record class MatchResult(string FilePath);
 record class ErrorMatchResult(string FilePath, string Message) : MatchResult(FilePath);
 
 /// <summary>
+///   Represents a section of a line with matching text.
+/// </summary>
+record struct MatchSpan(int Column, int Length);
+
+/// <summary>
 ///   Represents a successful match.
 /// </summary>
-record class LineMatchResult(string FilePath, int LineNumber, int Column, int Length, string Line) : MatchResult(FilePath);
+record class LineMatchResult(string FilePath, int LineNumber, IEnumerable<MatchSpan> Spans, string Line) : MatchResult(FilePath);
